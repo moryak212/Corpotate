@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+
+# VS Code
+.vscode/
+
+# User-specific / OS
+*.user
+*.suo
+.DS_Store
+
+# Databases (SQLite)
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
