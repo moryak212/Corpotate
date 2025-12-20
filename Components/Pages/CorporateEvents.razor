@@ -1,0 +1,243 @@
+
+@page "/events"
+@rendermode InteractiveServer
+
+
+@using Corporate.Data
+@using Corporate.Models
+@using Microsoft.EntityFrameworkCore
+@inject CorporateDbContext Db
+@inject IWebHostEnvironment Env
+
+
+<h3>Корпоративы</h3>
+
+<div class="row mb-4">
+    <div class="col-md-7">
+        <EditForm Model="@currentEvent" OnValidSubmit="@SaveEvent" FormName="EventForm">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label class="form-label">Название</label>
+                <InputText class="form-control" @bind-Value="currentEvent.Title" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Дата</label>
+                <InputDate class="form-control" @bind-Value="currentEvent.EventDate" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Описание</label>
+                <InputTextArea class="form-control" @bind-Value="currentEvent.Description" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Площадка</label>
+                <select class="form-select" @bind="currentEvent.VenueId">
+                    <option value="">-- не выбрано --</option>
+                    @foreach (var v in venues)
+                    {
+                        <option value="@v.Id">@v.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Организатор</label>
+                <select class="form-select" @bind="currentEvent.OrganizerId">
+                    <option value="">-- не выбрано --</option>
+                    @foreach (var e in employees)
+                    {
+                        <option value="@e.Id">@e.FullName</option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Изображение</label>
+                <InputFile OnChange="HandleFileSelected" />
+                @if (!string.IsNullOrEmpty(uploadError))
+                {
+                    <div class="text-danger">@uploadError</div>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(currentEvent.ImagePath))
+            {
+                <div class="mb-3">
+                    <label class="form-label">Текущее изображение:</label><br />
+                    <img src="@currentEvent.ImagePath" style="max-width: 200px; max-height: 200px;" />
+                </div>
+            }
+
+            <button type="submit" class="btn btn-primary me-2">Сохранить</button>
+            <button type="button" class="btn btn-secondary" @onclick="ResetForm">Отмена</button>
+        </EditForm>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Название</th>
+            <th>Дата</th>
+            <th>Площадка</th>
+            <th>Организатор</th>
+            <th>Участники</th>    
+            <th>Задачи</th>  
+            <th>Изображение</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var ev in events)
+        {
+            <tr>
+                <td>@ev.Title</td>
+                <td>@ev.EventDate.ToShortDateString()</td>
+                <td>@ev.Venue?.Name</td>
+                <td>@ev.Organizer?.FullName</td>
+                <td>@(ev.Participants?.Count ?? 0)</td>
+                <td>
+                    @{
+                        var totalTasks = ev.Tasks?.Count ?? 0;
+                        var completedTasks = ev.Tasks?.Count(t => t.Status == "Выполнена") ?? 0;
+                    }               
+                @completedTasks/@totalTasks
+                </td>
+                <td>
+                    @if (!string.IsNullOrEmpty(ev.ImagePath))
+                    {
+                        <img src="@ev.ImagePath" style="max-width: 100px; max-height: 100px;" />
+                    }
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-primary me-1" @onclick="() => EditEvent(ev.Id)">Ред.</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteEvent(ev.Id)">Удалить</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<CorporateEvent> events = new();
+    private List<Employee> employees = new();
+    private List<Venue> venues = new();
+
+    private CorporateEvent currentEvent = new();
+    private string? uploadError;
+    private const long MaxFileSize = 10 * 1024 * 1024; // 10 MB
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        currentEvent.EventDate = DateTime.Today;
+    }
+
+    private async Task LoadData()
+    {
+        employees = await Db.Employees
+            .OrderBy(e => e.FullName)
+            .ToListAsync();
+
+        venues = await Db.Venues
+            .OrderBy(v => v.Name)
+            .ToListAsync();
+
+        events = await Db.CorporateEvents
+            .Include(e => e.Venue)
+            .Include(e => e.Organizer)
+            .Include(e => e.Participants) 
+            .Include(e => e.Tasks)            
+            .OrderBy(e => e.EventDate)
+            .ToListAsync();
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        uploadError = null;
+
+        var file = e.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        if (file.Size > MaxFileSize)
+        {
+            uploadError = $"Файл слишком большой. Максимум {MaxFileSize / 1024 / 1024} МБ.";
+            return;
+        }
+
+        var extension = Path.GetExtension(file.Name);
+        var newFileName = Path.GetRandomFileName() + extension;
+
+        var uploadsFolder = Path.Combine(Env.WebRootPath, "uploads");
+        Directory.CreateDirectory(uploadsFolder);
+
+        var filePath = Path.Combine(uploadsFolder, newFileName);
+
+        await using var readStream = file.OpenReadStream(MaxFileSize);
+        await using var writeStream = File.Create(filePath);
+        await readStream.CopyToAsync(writeStream);
+
+        currentEvent.ImagePath = $"/uploads/{newFileName}";
+    }
+
+    private async Task SaveEvent()
+    {
+        if (currentEvent.Id == 0)
+        {
+            Db.CorporateEvents.Add(currentEvent);
+        }
+        else
+        {
+            Db.CorporateEvents.Update(currentEvent);
+        }
+
+        await Db.SaveChangesAsync();
+        await LoadData();
+        ResetForm();
+    }
+
+    private async Task EditEvent(int id)
+    {
+        var ev = await Db.CorporateEvents.FindAsync(id);
+        if (ev is not null)
+        {
+            currentEvent = new CorporateEvent
+            {
+                Id = ev.Id,
+                Title = ev.Title,
+                EventDate = ev.EventDate,
+                Description = ev.Description,
+                VenueId = ev.VenueId,
+                OrganizerId = ev.OrganizerId,
+                ImagePath = ev.ImagePath
+            };
+        }
+    }
+
+    private async Task DeleteEvent(int id)
+    {
+        var ev = await Db.CorporateEvents.FindAsync(id);
+        if (ev is not null)
+        {
+            Db.CorporateEvents.Remove(ev);
+            await Db.SaveChangesAsync();
+            await LoadData();
+        }
+    }
+
+    private void ResetForm()
+    {
+        currentEvent = new CorporateEvent
+        {
+            EventDate = DateTime.Today
+        };
+        uploadError = null;
+    }
+}

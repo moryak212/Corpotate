@@ -1,0 +1,222 @@
+@page "/tasks"
+@rendermode InteractiveServer
+
+
+@using Corporate.Data
+@using Corporate.Models
+@using Microsoft.EntityFrameworkCore
+@inject CorporateDbContext Db
+
+<h3>Задачи подготовки</h3>
+
+<div class="mb-4">
+    <label class="form-label">Корпоратив</label>
+    <select class="form-select" @onchange="OnEventChanged">
+        <option value="0">-- выберите корпоратив --</option>
+        @foreach (var ev in events)
+        {
+            <option value="@ev.Id" selected="@(ev.Id == selectedEventId)">
+                @ev.Title (@ev.EventDate.ToShortDateString())
+            </option>
+        }
+    </select>
+</div>
+
+@if (selectedEventId == 0)
+{
+    <p class="text-muted">Сначала выберите корпоратив.</p>
+}
+else
+{
+    <div class="row mb-4">
+        <div class="col-md-7">
+            <EditForm Model="@currentTask" OnValidSubmit="@SaveTask" FormName="TaskForm">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label class="form-label">Название задачи</label>
+                    <InputText class="form-control" @bind-Value="currentTask.Title" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Дедлайн</label>
+                    <InputDate class="form-control" @bind-Value="currentTask.Deadline" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Исполнитель</label>
+                    <select class="form-select" @bind="currentTask.EmployeeId">
+                        <option value="">-- не назначено --</option>
+                        @foreach (var e in employees)
+                        {
+                            <option value="@e.Id">@e.FullName</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Статус</label>
+                    <select class="form-select" @bind="currentTask.Status">
+                        @foreach (var s in statuses)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Комментарий</label>
+                    <InputTextArea class="form-control" @bind-Value="currentTask.Comment" />
+                </div>
+
+                <button type="submit" class="btn btn-primary me-2">Сохранить</button>
+                <button type="button" class="btn btn-secondary" @onclick="ResetForm">Отмена</button>
+            </EditForm>
+        </div>
+    </div>
+
+    <h5>Список задач</h5>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Название</th>
+                <th>Дедлайн</th>
+                <th>Исполнитель</th>
+                <th>Статус</th>
+                <th>Комментарий</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var t in tasks)
+            {
+                <tr>
+                    <td>@t.Title</td>
+                    <td>@t.Deadline.ToShortDateString()</td>
+                    <td>@t.Executor?.FullName</td>
+                    <td>@t.Status</td>
+                    <td>@t.Comment</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary me-1" @onclick="() => EditTask(t.Id)">Ред.</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteTask(t.Id)">Удалить</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<CorporateEvent> events = new();
+    private List<Employee> employees = new();
+    private List<EventTask> tasks = new();
+
+    private EventTask currentTask = new();
+
+    private int selectedEventId;
+
+    private readonly string[] statuses = new[]
+    {
+        "Новая",
+        "В процессе",
+        "Выполнена",
+        "Отложена"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEventsAndEmployees();
+
+        if (events.Any())
+        {
+            selectedEventId = events.First().Id;
+            await LoadTasks();
+        }
+    }
+
+    private async Task LoadEventsAndEmployees()
+    {
+        events = await Db.CorporateEvents.OrderBy(e => e.EventDate).ToListAsync();
+        employees = await Db.Employees.OrderBy(e => e.FullName).ToListAsync();
+    }
+
+    private async Task LoadTasks()
+    {
+        tasks = await Db.EventTasks
+            .Include(t => t.Executor)
+            .Where(t => t.CorporateEventId == selectedEventId)
+            .OrderBy(t => t.Deadline)
+            .ToListAsync();
+    }
+
+    private async Task OnEventChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            selectedEventId = id;
+            await LoadTasks();
+            ResetForm();
+        }
+    }
+
+    private async Task SaveTask()
+    {
+        if (string.IsNullOrWhiteSpace(currentTask.Title))
+            return;
+
+        currentTask.CorporateEventId = selectedEventId;
+
+        if (currentTask.Id == 0)
+        {
+            Db.EventTasks.Add(currentTask);
+        }
+        else
+        {
+            Db.EventTasks.Update(currentTask);
+        }
+
+        await Db.SaveChangesAsync();
+        await LoadTasks();
+        ResetForm();
+    }
+
+    private async Task EditTask(int id)
+    {
+        var t = await Db.EventTasks.FindAsync(id);
+        if (t != null)
+        {
+            currentTask = new EventTask
+            {
+                Id = t.Id,
+                CorporateEventId = t.CorporateEventId,
+                EmployeeId = t.EmployeeId,
+                Title = t.Title,
+                Deadline = t.Deadline,
+                Status = t.Status,
+                Comment = t.Comment
+            };
+        }
+    }
+
+    private async Task DeleteTask(int id)
+    {
+        var t = await Db.EventTasks.FindAsync(id);
+        if (t != null)
+        {
+            Db.EventTasks.Remove(t);
+            await Db.SaveChangesAsync();
+            await LoadTasks();
+        }
+    }
+
+    private void ResetForm()
+    {
+        currentTask = new EventTask
+        {
+            Deadline = DateTime.Today.AddDays(7),
+            Status = statuses[0]
+        };
+    }
+}

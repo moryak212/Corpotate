@@ -1,0 +1,238 @@
+@page "/participants"
+@rendermode InteractiveServer
+
+
+@using Corporate.Data
+@using Corporate.Models
+@using Microsoft.EntityFrameworkCore
+@inject CorporateDbContext Db
+
+<h3>Участники корпоративов</h3>
+
+<div class="mb-4">
+    <label class="form-label">Корпоратив</label>
+    <select class="form-select" @onchange="OnEventChanged">
+        <option value="0">-- выберите корпоратив --</option>
+        @foreach (var ev in events)
+        {
+            <option value="@ev.Id" selected="@(ev.Id == selectedEventId)">
+                @ev.Title (@ev.EventDate.ToShortDateString())
+            </option>
+        }
+    </select>
+</div>
+
+@if (selectedEventId == 0)
+{
+    <p class="text-muted">Сначала выберите корпоратив из списка выше.</p>
+}
+else
+{
+    <div class="row mb-4">
+        <div class="col-md-7">
+            <EditForm Model="@currentParticipant" OnValidSubmit="@SaveParticipant" FormName="ParticipantForm">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label class="form-label">Сотрудник</label>
+                    <select class="form-select" @bind="currentParticipant.EmployeeId">
+                        <option value="0">-- выберите сотрудника --</option>
+                        @foreach (var e in employees)
+                        {
+                            <option value="@e.Id">@e.FullName</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Роль</label>
+                    <select class="form-select" @bind="currentParticipant.Role">
+                        @foreach (var r in roles)
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Статус</label>
+                    <select class="form-select" @bind="currentParticipant.Status">
+                        @foreach (var s in statuses)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Комментарий</label>
+                    <InputTextArea class="form-control" @bind-Value="currentParticipant.Comment" />
+                </div>
+
+                <button type="submit" class="btn btn-primary me-2">Сохранить</button>
+                <button type="button" class="btn btn-secondary" @onclick="ResetForm">Отмена</button>
+            </EditForm>
+        </div>
+    </div>
+
+    <h5>Список участников выбранного корпоратива</h5>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Сотрудник</th>
+                <th>Роль</th>
+                <th>Статус</th>
+                <th>Комментарий</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in participants)
+            {
+                <tr>
+                    <td>@p.Employee?.FullName</td>
+                    <td>@p.Role</td>
+                    <td>@p.Status</td>
+                    <td>@p.Comment</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary me-1" @onclick="() => EditParticipant(p.Id)">Ред.</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteParticipant(p.Id)">Удалить</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<CorporateEvent> events = new();
+    private List<Employee> employees = new();
+    private List<EventParticipant> participants = new();
+
+    private EventParticipant currentParticipant = new();
+
+    private int selectedEventId;
+
+    private readonly string[] roles =
+    {
+        "Участник",
+        "Организатор",
+        "Ведущий",
+        "Технический персонал"
+    };
+
+    private readonly string[] statuses =
+    {
+        "Приглашён",
+        "Подтвердил участие",
+        "Отказался",
+        "Не ответил"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEventsAndEmployees();
+
+        if (events.Any())
+        {
+            selectedEventId = events.First().Id;
+            await LoadParticipants();
+        }
+    }
+
+    private async Task LoadEventsAndEmployees()
+    {
+        events = await Db.CorporateEvents
+            .OrderBy(e => e.EventDate)
+            .ToListAsync();
+
+        employees = await Db.Employees
+            .OrderBy(e => e.FullName)
+            .ToListAsync();
+    }
+
+    private async Task LoadParticipants()
+    {
+        if (selectedEventId == 0)
+        {
+            participants = new List<EventParticipant>();
+            return;
+        }
+
+        participants = await Db.EventParticipants
+            .Include(p => p.Employee)
+            .Where(p => p.CorporateEventId == selectedEventId)
+            .OrderBy(p => p.Employee!.FullName)
+            .ToListAsync();
+    }
+
+    private async Task OnEventChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            selectedEventId = id;
+            await LoadParticipants();
+            ResetForm();
+        }
+    }
+
+    private async Task SaveParticipant()
+    {
+        if (selectedEventId == 0 || currentParticipant.EmployeeId == 0)
+            return;
+
+        currentParticipant.CorporateEventId = selectedEventId;
+
+        if (currentParticipant.Id == 0)
+        {
+            Db.EventParticipants.Add(currentParticipant);
+        }
+        else
+        {
+            Db.EventParticipants.Update(currentParticipant);
+        }
+
+        await Db.SaveChangesAsync();
+        await LoadParticipants();
+        ResetForm();
+    }
+
+    private async Task EditParticipant(int id)
+    {
+        var p = await Db.EventParticipants.FindAsync(id);
+        if (p is not null)
+        {
+            currentParticipant = new EventParticipant
+            {
+                Id = p.Id,
+                CorporateEventId = p.CorporateEventId,
+                EmployeeId = p.EmployeeId,
+                Role = p.Role,
+                Status = p.Status,
+                Comment = p.Comment
+            };
+        }
+    }
+
+    private async Task DeleteParticipant(int id)
+    {
+        var p = await Db.EventParticipants.FindAsync(id);
+        if (p is not null)
+        {
+            Db.EventParticipants.Remove(p);
+            await Db.SaveChangesAsync();
+            await LoadParticipants();
+        }
+    }
+
+    private void ResetForm()
+    {
+        currentParticipant = new EventParticipant
+        {
+            Role = roles[0],
+            Status = statuses[0]
+        };
+    }
+}

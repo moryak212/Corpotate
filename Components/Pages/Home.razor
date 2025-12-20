@@ -1,0 +1,334 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+@using Corporate.Data
+@using Corporate.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject CorporateDbContext Db
+
+<h3 class="mb-4">Панель управления корпоративами</h3>
+
+@if (isLoading)
+{
+    <p>Загрузка...</p>
+}
+else
+{
+    <!-- Первая строка карточек -->
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-uppercase text-muted mb-1">Корпоративы</h6>
+                            <div class="display-6 fw-semibold">@totalEvents</div>
+                            <div class="text-muted small">
+                                Предстоящих: <strong>@upcomingEvents</strong><br />
+                                В этом месяце: <strong>@eventsThisMonth</strong>
+                            </div>
+                        </div>
+                        <span class="bi bi-people-fill-nav-menu" style="opacity:0.2;"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-uppercase text-muted mb-1">Сотрудники и площадки</h6>
+                            <div class="display-6 fw-semibold">@totalEmployees</div>
+                            <div class="text-muted small">
+                                Сотрудников<br />
+                                Площадок: <strong>@totalVenues</strong>
+                            </div>
+                        </div>
+                        <span class="bi bi-person-badge-fill-nav-menu" style="opacity:0.2;"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-muted mb-1">Задачи подготовки</h6>
+                    <div class="d-flex align-items-baseline mb-2">
+                        <div class="display-6 fw-semibold me-2">@completedTasks</div>
+                        <div class="fs-5 text-muted">/ @totalTasks</div>
+                    </div>
+                    <div class="progress" style="height: 0.7rem;">
+                        <div class="progress-bar" role="progressbar" style="width: @taskCompletionPercent%;"
+                            aria-valuenow="@taskCompletionPercent" aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        Выполнено @taskCompletionPercent.ToString("0") % всех задач
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Вторая строка: диаграмма статусов задач -->
+    <div class="row g-3 mb-3">
+        <div class="card-body">
+            <h5 class="card-title mb-3">Статусы задач</h5>
+
+            @if (totalTasks == 0)
+            {
+                <p class="text-muted">Задач пока нет.</p>
+            }
+            else
+            {
+                <div class="mb-2 small text-muted">
+                    Новые: @newTasks,
+                    В процессе: @inProgressTasks,
+                    Выполнены: @doneTasks,
+                    Отложены: @postponedTasks
+                </div>
+
+                <div class="d-flex flex-column flex-md-row align-items-center">
+                    <div class="task-pie me-md-4 mb-3 mb-md-0" style="@PieStyle"></div>
+
+                    <ul class="list-unstyled small mb-0">
+                        <li class="d-flex align-items-center mb-1">
+                            <span class="legend-color me-2" style="background-color:#6c757d;"></span>
+                            Новые (@newTasks)
+                        </li>
+                        <li class="d-flex align-items-center mb-1">
+                            <span class="legend-color me-2" style="background-color:#ffc107;"></span>
+                            В процессе (@inProgressTasks)
+                        </li>
+                        <li class="d-flex align-items-center mb-1">
+                            <span class="legend-color me-2" style="background-color:#198754;"></span>
+                            Выполнены (@doneTasks)
+                        </li>
+                        <li class="d-flex align-items-center">
+                            <span class="legend-color me-2" style="background-color:#dc3545;"></span>
+                            Отложены (@postponedTasks)
+                        </li>
+                        <li class="mt-2 text-muted">
+                            Всего задач: @totalTasks
+                        </li>
+                    </ul>
+                </div>
+            }
+        </div>
+
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Топ организаторов</h5>
+
+                    @if (!topOrganizers.Any())
+                    {
+                        <p class="text-muted">Пока нет данных по организаторам.</p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var o in topOrganizers)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>@o.Name</span>
+                                    <span class="badge bg-primary rounded-pill">@o.EventCount</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Третья строка: ближайшие корпоративы -->
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Ближайшие корпоративы</h5>
+
+                    @if (!upcomingEventList.Any())
+                    {
+                        <p class="text-muted">Нет запланированных корпоративов.</p>
+                    }
+                    else
+                    {
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Название</th>
+                                    <th>Площадка</th>
+                                    <th>Организатор</th>
+                                    <th class="text-center">Задачи</th>
+                                    <th class="text-center">Участники</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ev in upcomingEventList)
+                                {
+                                    var totalT = ev.Tasks?.Count ?? 0;
+                                    var doneT = ev.Tasks?.Count(t => t.Status == "Выполнена") ?? 0;
+                                    var participantsCount = ev.Participants?.Count ?? 0;
+
+                                    <tr>
+                                        <td>@ev.EventDate.ToShortDateString()</td>
+                                        <td>@ev.Title</td>
+                                        <td>@ev.Venue?.Name</td>
+                                        <td>@ev.Organizer?.FullName</td>
+                                        <td class="text-center">@doneT/@totalT</td>
+                                        <td class="text-center">@participantsCount</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isLoading = true;
+
+    private int totalEvents;
+    private int upcomingEvents;
+    private int eventsThisMonth;
+    private int totalEmployees;
+    private int totalVenues;
+    private int totalTasks;
+    private int completedTasks;
+
+    // для диаграммы статусов
+    private int newTasks;
+    private int inProgressTasks;
+    private int doneTasks;
+    private int postponedTasks;
+
+    private double taskCompletionPercent => totalTasks == 0
+    ? 0
+    : (double)completedTasks / totalTasks * 100.0;
+
+    private double Percent(int count) => totalTasks == 0 ? 0 : (double)count / totalTasks * 100.0;
+    private double newPercent => Percent(newTasks);
+    private double inProgressPercent => Percent(inProgressTasks);
+    private double donePercent => Percent(doneTasks);
+    private double postponedPercent => Percent(postponedTasks);
+
+    private List<CorporateEvent> upcomingEventList = new();
+
+    private List<(string Name, int EventCount)> topOrganizers = new();
+    private string PieStyle
+    {
+        get
+        {
+            if (totalTasks == 0) return string.Empty;
+
+            var pNew = newPercent;
+            var pInProg = inProgressPercent;
+            var pDone = donePercent;
+            var pPostponed = postponedPercent;
+
+            var stop1 = pNew;
+            var stop2 = pNew + pInProg;
+            var stop3 = stop2 + pDone;
+            // остаток до 100% – отложенные
+
+            string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+            return $"background: conic-gradient(" +
+            $"#6c757d 0 {F(stop1)}%, " + // Новые
+            $"#ffc107 {F(stop1)}% {F(stop2)}%, " + // В процессе
+            $"#198754 {F(stop2)}% {F(stop3)}%, " + // Выполнены
+            $"#dc3545 {F(stop3)}% 100%);"; // Отложены
+        }
+    }
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        var today = DateTime.Today;
+        var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
+        var nextMonth = firstDayOfMonth.AddMonths(1);
+
+        totalEvents = await Db.CorporateEvents.CountAsync();
+        upcomingEvents = await Db.CorporateEvents.CountAsync(e => e.EventDate >= today);
+        eventsThisMonth = await Db.CorporateEvents.CountAsync(e => e.EventDate >= firstDayOfMonth && e.EventDate < nextMonth);
+
+        totalEmployees = await Db.Employees.CountAsync();
+        totalVenues = await Db.Venues.CountAsync();
+
+        totalTasks = await Db.EventTasks.CountAsync();
+        completedTasks = await Db.EventTasks.CountAsync(t => t.Status == "Выполнена");
+
+        // группировка задач по статусам для диаграммы
+        var groups = await Db.EventTasks
+        .GroupBy(t => t.Status)
+        .Select(g => new { Status = g.Key, Count = g.Count() })
+        .ToListAsync();
+
+        newTasks = groups.FirstOrDefault(g => g.Status == "Новая")?.Count ?? 0;
+        inProgressTasks = groups.FirstOrDefault(g => g.Status == "В процессе")?.Count ?? 0;
+        doneTasks = groups.FirstOrDefault(g => g.Status == "Выполнена")?.Count ?? 0;
+        postponedTasks = groups.FirstOrDefault(g => g.Status == "Отложена")?.Count ?? 0;
+
+        upcomingEventList = await Db.CorporateEvents
+        .Include(e => e.Venue)
+        .Include(e => e.Organizer)
+        .Include(e => e.Tasks)
+        .Include(e => e.Participants)
+        .Where(e => e.EventDate >= today)
+        .OrderBy(e => e.EventDate)
+        .Take(5)
+        .ToListAsync();
+
+        // топ организаторов
+        topOrganizers = await Db.CorporateEvents
+        .Where(e => e.Organizer != null)
+        .GroupBy(e => e.Organizer!.FullName)
+        .Select(g => new { Name = g.Key, Count = g.Count() })
+        .OrderByDescending(x => x.Count)
+        .Take(5)
+        .Select(x => new ValueTuple<string, int>(x.Name, x.Count))
+        .ToListAsync();
+
+        isLoading = false;
+    }
+
+}
+<style>
+    .task-pie {
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        position: relative;
+        background-size: cover;
+    }
+
+    .task-pie::after {
+        content: "";
+        position: absolute;
+        inset: 18%;
+        border-radius: 50%;
+        background-color: #ffffff;
+        /* фон внутри пончика */
+    }
+
+    .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        display: inline-block;
+    }
+</style>

@@ -1,0 +1,217 @@
+@page "/files"
+@rendermode InteractiveServer
+
+
+@using Corporate.Data
+@using Corporate.Models
+@using Microsoft.EntityFrameworkCore
+@inject CorporateDbContext Db
+@inject IWebHostEnvironment Env
+
+<h3>Файлы корпоративов</h3>
+
+<div class="mb-4">
+    <label class="form-label">Корпоратив</label>
+    <select class="form-select" @onchange="OnEventChanged">
+        <option value="0">-- выберите корпоратив --</option>
+        @foreach (var ev in events)
+        {
+            <option value="@ev.Id" selected="@(ev.Id == selectedEventId)">
+                @ev.Title (@ev.EventDate.ToShortDateString())
+            </option>
+        }
+    </select>
+</div>
+
+@if (selectedEventId == 0)
+{
+    <p class="text-muted">Сначала выберите корпоратив.</p>
+}
+else
+{
+    <div class="row mb-4">
+        <div class="col-md-7">
+            <div class="mb-3">
+                <label class="form-label">Загрузить файлы</label>
+                <InputFile OnChange="HandleFilesSelected" multiple />
+                @if (!string.IsNullOrEmpty(uploadError))
+                {
+                    <div class="text-danger mt-2">@uploadError</div>
+                }
+                <div class="form-text">
+                    Можно выбрать несколько файлов. Максимальный размер одного файла — @MaxFileSizeMb МБ.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h5>Файлы этого корпоратива</h5>
+
+    @if (!files.Any())
+    {
+        <p class="text-muted">Пока файлов нет.</p>
+    }
+    else
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Имя файла</th>
+                    <th>Тип</th>
+                    <th>Дата загрузки</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in files)
+                {
+                    <tr>
+                        <td>@f.FileName</td>
+                        <td>@f.ContentType</td>
+                        <td>@f.UploadedAt.ToLocalTime().ToString("g")</td>
+                        <td>
+                            <a href="@f.FilePath" download="@f.FileName"
+                               class="btn btn-sm btn-outline-secondary me-1">
+                                Скачать
+                            </a>
+                            <button class="btn btn-sm btn-danger"
+                                    @onclick="() => DeleteFile(f.Id)">
+                                Удалить
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private List<CorporateEvent> events = new();
+    private List<EventFile> files = new();
+
+    private int selectedEventId;
+    private string? uploadError;
+
+    private const long MaxFileSize = 20 * 1024 * 1024; // 20 MB
+    private const int MaxFileSizeMb = 20;
+
+    protected override async Task OnInitializedAsync()
+    {
+        events = await Db.CorporateEvents
+            .OrderBy(e => e.EventDate)
+            .ToListAsync();
+
+        if (events.Any())
+        {
+            selectedEventId = events.First().Id;
+            await LoadFiles();
+        }
+    }
+
+    private async Task OnEventChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            selectedEventId = id;
+            await LoadFiles();
+            uploadError = null;
+        }
+    }
+
+    private async Task LoadFiles()
+    {
+        if (selectedEventId == 0)
+        {
+            files = new List<EventFile>();
+            return;
+        }
+
+        files = await Db.EventFiles
+            .Where(f => f.CorporateEventId == selectedEventId)
+            .OrderByDescending(f => f.UploadedAt)
+            .ToListAsync();
+    }
+
+    private async Task HandleFilesSelected(InputFileChangeEventArgs e)
+    {
+        if (selectedEventId == 0)
+            return;
+
+        uploadError = null;
+
+        var selectedFiles = e.GetMultipleFiles();
+
+        if (!selectedFiles.Any())
+            return;
+
+        var uploadRoot = Path.Combine(Env.WebRootPath, "uploads", "eventfiles");
+        Directory.CreateDirectory(uploadRoot);
+
+        foreach (var file in selectedFiles)
+        {
+            if (file.Size > MaxFileSize)
+            {
+                uploadError = $"Файл {file.Name} слишком большой. Максимум {MaxFileSizeMb} МБ.";
+                continue;
+            }
+
+            var ext = Path.GetExtension(file.Name);
+            var storedName = Path.GetRandomFileName() + ext;
+            var physicalPath = Path.Combine(uploadRoot, storedName);
+
+            await using var readStream = file.OpenReadStream(MaxFileSize);
+            await using var writeStream = File.Create(physicalPath);
+            await readStream.CopyToAsync(writeStream);
+
+            var relativePath = $"/uploads/eventfiles/{storedName}";
+
+            var entity = new EventFile
+            {
+                CorporateEventId = selectedEventId,
+                FileName = file.Name,
+                StoredFileName = storedName,
+                FilePath = relativePath,
+                ContentType = file.ContentType,
+                UploadedAt = DateTime.UtcNow
+            };
+
+            Db.EventFiles.Add(entity);
+        }
+
+        await Db.SaveChangesAsync();
+        await LoadFiles();
+    }
+
+    private async Task DeleteFile(int id)
+    {
+        var f = await Db.EventFiles.FindAsync(id);
+        if (f is null)
+            return;
+
+        Db.EventFiles.Remove(f);
+        await Db.SaveChangesAsync();
+
+        // пытаемся удалить физический файл
+        try
+        {
+            if (!string.IsNullOrEmpty(f.FilePath))
+            {
+                var relative = f.FilePath.TrimStart('/')
+                    .Replace('/', Path.DirectorySeparatorChar);
+                var physicalPath = Path.Combine(Env.WebRootPath, relative);
+
+                if (File.Exists(physicalPath))
+                {
+                    File.Delete(physicalPath);
+                }
+            }
+        }
+        catch
+        {
+            // в проде логируем, здесь просто игнорируем
+        }
+
+        await LoadFiles();
+    }
+}

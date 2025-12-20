@@ -1,0 +1,134 @@
+@page "/venues"
+@rendermode InteractiveServer
+
+
+@using Corporate.Data
+@using Corporate.Models
+@using Microsoft.EntityFrameworkCore
+@inject CorporateDbContext Db
+
+<h3>Места проведения</h3>
+
+<div class="row mb-4">
+    <div class="col-md-7">
+        <EditForm Model="@currentVenue" OnValidSubmit="@SaveVenue" FormName="VenueForm">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label class="form-label">Название площадки</label>
+                <InputText class="form-control" @bind-Value="currentVenue.Name" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Адрес</label>
+                <InputText class="form-control" @bind-Value="currentVenue.Address" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Вместимость</label>
+                <InputNumber class="form-control" @bind-Value="currentVenue.Capacity" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Контактный телефон</label>
+                <InputText class="form-control" @bind-Value="currentVenue.ContactPhone" />
+            </div>
+
+            <button type="submit" class="btn btn-primary me-2">Сохранить</button>
+            <button type="button" class="btn btn-secondary" @onclick="ResetForm">Отмена</button>
+        </EditForm>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Название</th>
+            <th>Адрес</th>
+            <th>Вместимость</th>
+            <th>Телефон</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var v in venues)
+        {
+            <tr>
+                <td>@v.Name</td>
+                <td>@v.Address</td>
+                <td>@v.Capacity</td>
+                <td>@v.ContactPhone</td>
+                <td>
+                    <button class="btn btn-sm btn-primary me-1" @onclick="() => EditVenue(v.Id)">Ред.</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteVenue(v.Id)">Удалить</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Venue> venues = new();
+    private Venue currentVenue = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadVenues();
+    }
+
+    private async Task LoadVenues()
+    {
+        venues = await Db.Venues
+            .OrderBy(v => v.Name)
+            .ToListAsync();
+    }
+
+    private async Task SaveVenue()
+    {
+        if (currentVenue.Id == 0)
+        {
+            Db.Venues.Add(currentVenue);
+        }
+        else
+        {
+            Db.Venues.Update(currentVenue);
+        }
+
+        await Db.SaveChangesAsync();
+        await LoadVenues();
+        ResetForm();
+    }
+
+    private async Task EditVenue(int id)
+    {
+        var v = await Db.Venues.FindAsync(id);
+        if (v is not null)
+        {
+            currentVenue = new Venue
+            {
+                Id = v.Id,
+                Name = v.Name,
+                Address = v.Address,
+                Capacity = v.Capacity,
+                ContactPhone = v.ContactPhone
+            };
+        }
+    }
+
+    private async Task DeleteVenue(int id)
+    {
+        var v = await Db.Venues.FindAsync(id);
+        if (v is not null)
+        {
+            Db.Venues.Remove(v);
+            await Db.SaveChangesAsync();
+            await LoadVenues();
+        }
+    }
+
+    private void ResetForm()
+    {
+        currentVenue = new Venue();
+    }
+}
