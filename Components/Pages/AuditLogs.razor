@@ -1,0 +1,46 @@
+@page "/auditlogs"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Corporate.Models
+@inject CorporateDbContext Db
+
+<h3>Журнал действий</h3>
+
+<table class="table table-sm table-striped">
+    <thead>
+        <tr>
+            <th>Дата</th>
+            <th>Пользователь</th>
+            <th>Действие</th>
+            <th>Объект</th>
+            <th>ID</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var log in logs)
+        {
+            <tr>
+                <td>@log.CreatedAt.ToLocalTime()</td>
+                <td>@log.UserEmail</td>
+                <td>@log.Action</td>
+                <td>@log.EntityName</td>
+                <td>@log.EntityId</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<AuditLog> logs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        logs = await Db.AuditLogs
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(200)
+            .ToListAsync();
+    }
+}

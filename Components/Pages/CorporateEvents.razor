@@ -6,8 +6,11 @@
 @using Corporate.Data
 @using Corporate.Models
 @using Microsoft.EntityFrameworkCore
+@using Corporate.Services
 @inject CorporateDbContext Db
 @inject IWebHostEnvironment Env
+@inject AuditService AuditService
+
 
 
 <h3>Корпоративы</h3>
@@ -194,6 +197,11 @@
 
     private async Task SaveEvent()
     {
+        await AuditService.LogAsync(
+        currentEvent.Id == 0 ? "Create" : "Update",
+        "CorporateEvent",
+        currentEvent.Id
+        );
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
@@ -246,6 +254,11 @@
 
     private async Task DeleteEvent(int id)
     {
+        await AuditService.LogAsync(
+        "Delete",
+        "CorporateEvent",
+        id
+        );
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 

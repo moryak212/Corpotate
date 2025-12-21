@@ -4,8 +4,11 @@
 
 @using Corporate.Data
 @using Corporate.Models
+
 @using Microsoft.EntityFrameworkCore
 @inject CorporateDbContext Db
+@using Corporate.Services
+@inject AuditService AuditService
 
 <h3>Задачи подготовки</h3>
 
@@ -119,11 +122,11 @@ else
 
     private readonly string[] statuses = new[]
     {
-        "Новая",
-        "В процессе",
-        "Выполнена",
-        "Отложена"
-    };
+"Новая",
+"В процессе",
+"Выполнена",
+"Отложена"
+};
 
     protected override async Task OnInitializedAsync()
     {
@@ -145,10 +148,10 @@ else
     private async Task LoadTasks()
     {
         tasks = await Db.EventTasks
-            .Include(t => t.Executor)
-            .Where(t => t.CorporateEventId == selectedEventId)
-            .OrderBy(t => t.Deadline)
-            .ToListAsync();
+        .Include(t => t.Executor)
+        .Where(t => t.CorporateEventId == selectedEventId)
+        .OrderBy(t => t.Deadline)
+        .ToListAsync();
     }
 
     private async Task OnEventChanged(ChangeEventArgs e)
@@ -163,6 +166,7 @@ else
 
     private async Task SaveTask()
     {
+
         if (string.IsNullOrWhiteSpace(currentTask.Title))
             return;
 
@@ -178,6 +182,11 @@ else
         }
 
         await Db.SaveChangesAsync();
+        var action = currentTask.Id == 0 ? "Create" : "Update";
+
+        await Db.SaveChangesAsync();
+
+        await AuditService.LogAsync(action, "EventTask", currentTask.Id);
         await LoadTasks();
         ResetForm();
     }
@@ -203,12 +212,15 @@ else
     private async Task DeleteTask(int id)
     {
         var t = await Db.EventTasks.FindAsync(id);
-        if (t != null)
-        {
-            Db.EventTasks.Remove(t);
-            await Db.SaveChangesAsync();
-            await LoadTasks();
-        }
+        if (t is null)
+            return;
+
+        Db.EventTasks.Remove(t);
+        await Db.SaveChangesAsync();
+
+        await AuditService.LogAsync("Delete", "EventTask", id);
+
+        await LoadTasks();
     }
 
     private void ResetForm()

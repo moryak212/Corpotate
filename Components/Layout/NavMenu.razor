@@ -47,6 +47,17 @@
                     </Authorized>
                 </AuthorizeView>
 
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="/auditlogs">
+                                <span class="bi bi-people-fill-nav-menu"></span>
+                                Аудит логов
+                            </NavLink>
+                        </div>
+                    </Authorized>
+                </AuthorizeView>
+
                 <AuthorizeView Roles="Admin,Organizer" Context="orgAuth">
                     <Authorized>
                         <div class="nav-item px-3">

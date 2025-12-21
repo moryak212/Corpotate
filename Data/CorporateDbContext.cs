@@ -2,6 +2,7 @@ using Corporate.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
+
 namespace Corporate.Data;
 
 public class CorporateDbContext : IdentityDbContext<AppUser>
@@ -18,4 +19,5 @@ public class CorporateDbContext : IdentityDbContext<AppUser>
     public DbSet<EventParticipant> EventParticipants => Set<EventParticipant>();
     public DbSet<EventTask> EventTasks => Set<EventTask>();
     public DbSet<EventFile> EventFiles => Set<EventFile>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 }

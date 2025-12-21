@@ -6,8 +6,9 @@
 @using Corporate.Data
 @using Corporate.Models
 @using Microsoft.EntityFrameworkCore
+@using Corporate.Services
 @inject CorporateDbContext Db
-
+@inject AuditService AuditService
 <h3>Сотрудники</h3>
 
 <div class="row mb-4">
@@ -95,13 +96,13 @@
     private async Task LoadData()
     {
         departments = await Db.Departments
-            .OrderBy(d => d.Name)
-            .ToListAsync();
+        .OrderBy(d => d.Name)
+        .ToListAsync();
 
         employees = await Db.Employees
-            .Include(e => e.Department)
-            .OrderBy(e => e.FullName)
-            .ToListAsync();
+        .Include(e => e.Department)
+        .OrderBy(e => e.FullName)
+        .ToListAsync();
     }
 
     private async Task SaveEmployee()
@@ -116,6 +117,12 @@
         }
 
         await Db.SaveChangesAsync();
+        var action = currentEmployee.Id == 0 ? "Create" : "Update";
+
+        await Db.SaveChangesAsync();
+
+        await AuditService.LogAsync(action, "Employee", currentEmployee.Id);
+
         await LoadData();
         ResetForm();
     }
@@ -146,6 +153,9 @@
             await Db.SaveChangesAsync();
             await LoadData();
         }
+        await Db.SaveChangesAsync();
+
+        await AuditService.LogAsync("Delete", "Employee", id);
     }
 
     private void ResetForm()

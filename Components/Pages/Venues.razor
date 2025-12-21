@@ -6,7 +6,9 @@
 @using Corporate.Data
 @using Corporate.Models
 @using Microsoft.EntityFrameworkCore
+@using Corporate.Services
 @inject CorporateDbContext Db
+@inject AuditService AuditService
 
 <h3>Места проведения</h3>
 
@@ -81,8 +83,8 @@
     private async Task LoadVenues()
     {
         venues = await Db.Venues
-            .OrderBy(v => v.Name)
-            .ToListAsync();
+        .OrderBy(v => v.Name)
+        .ToListAsync();
     }
 
     private async Task SaveVenue()
@@ -97,6 +99,12 @@
         }
 
         await Db.SaveChangesAsync();
+        var action = currentVenue.Id == 0 ? "Create" : "Update";
+
+        await Db.SaveChangesAsync();
+
+        await AuditService.LogAsync(action, "Venue", currentVenue.Id);
+
         await LoadVenues();
         ResetForm();
     }
@@ -126,6 +134,10 @@
             await Db.SaveChangesAsync();
             await LoadVenues();
         }
+        await Db.SaveChangesAsync();
+
+        await AuditService.LogAsync("Delete", "Venue", id);
+
     }
 
     private void ResetForm()

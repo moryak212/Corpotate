@@ -167,8 +167,6 @@ C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\Corporate
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\Corporate.genruntimeconfig.cache
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\ref\Corporate.dll
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\l6tn4xr329-im23l3fd51.gz
-C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\x8cuibxnzx-s2j1486tiw.gz
-C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\vg58fgy5q3-s2j1486tiw.gz
 C:\Users\Серафим\Downloads\Corporate\Corporate\bin\Debug\net9.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll
 C:\Users\Серафим\Downloads\Corporate\Corporate\bin\Debug\net9.0\Microsoft.AspNetCore.Identity.UI.dll
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\Corporate.MvcApplicationPartsAssemblyInfo.cs
@@ -232,3 +230,5 @@ C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compresse
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\b9lhb08218-5pze98is44.gz
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\yfc7ypekbg-mlv21k5csn.gz
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\Corporate.sourcelink.json
+C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\x8cuibxnzx-0plzyluc5h.gz
+C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\vg58fgy5q3-0plzyluc5h.gz
