@@ -16,6 +16,14 @@ builder.Services.AddIdentity<AppUser, IdentityRole>()
     .AddEntityFrameworkStores<CorporateDbContext>()
     .AddDefaultTokenProviders();
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CanManageEvents", p => p.RequireRole("Admin", "Organizer"));
+    options.AddPolicy("CanManageEmployees", p => p.RequireRole("Admin"));
+    options.AddPolicy("CanManageVenues", p => p.RequireRole("Admin", "Organizer"));
+    options.AddPolicy("Authenticated", p => p.RequireAuthenticatedUser());
+});
+
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
@@ -67,4 +75,34 @@ app.MapPost("/account/logout", async (SignInManager<AppUser> signInManager) =>
     return Results.Redirect("/");
 })
 .DisableAntiforgery();
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+
+    string[] roles = { "Admin", "Organizer", "Employee" };
+
+    foreach (var role in roles)
+        if (!await roleManager.RoleExistsAsync(role))
+            await roleManager.CreateAsync(new IdentityRole(role));
+
+    // admin user
+    var adminEmail = "admin@corp.local";
+    var admin = await userManager.FindByEmailAsync(adminEmail);
+    if (admin == null)
+    {
+        admin = new AppUser
+        {
+            UserName = adminEmail,
+            Email = adminEmail,
+            FullName = "Администратор",
+            DepartmentId = 1, // важно: существующий DepartmentId
+            Position = "Администратор"
+        };
+
+        var create = await userManager.CreateAsync(admin, "Admin123!");
+        if (create.Succeeded)
+            await userManager.AddToRoleAsync(admin, "Admin");
+    }
+}
 app.Run();

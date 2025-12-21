@@ -1,5 +1,5 @@
-
 @page "/events"
+@attribute [Authorize(Policy = "Authenticated")]
 @rendermode InteractiveServer
 
 
@@ -85,8 +85,8 @@
             <th>Дата</th>
             <th>Площадка</th>
             <th>Организатор</th>
-            <th>Участники</th>    
-            <th>Задачи</th>  
+            <th>Участники</th>
+            <th>Задачи</th>
             <th>Изображение</th>
             <th></th>
         </tr>
@@ -104,8 +104,8 @@
                     @{
                         var totalTasks = ev.Tasks?.Count ?? 0;
                         var completedTasks = ev.Tasks?.Count(t => t.Status == "Выполнена") ?? 0;
-                    }               
-                @completedTasks/@totalTasks
+                    }
+                    @completedTasks/@totalTasks
                 </td>
                 <td>
                     @if (!string.IsNullOrEmpty(ev.ImagePath))
@@ -114,8 +114,10 @@
                     }
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-primary me-1" @onclick="() => EditEvent(ev.Id)">Ред.</button>
-                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteEvent(ev.Id)">Удалить</button>
+                    <AuthorizeView Policy="CanManageEvents">
+                        <button class="btn btn-sm btn-primary" ...>Ред.</button>
+                        <button class="btn btn-sm btn-danger" ...>Удалить</button>
+                    </AuthorizeView>
                 </td>
             </tr>
         }
@@ -123,6 +125,9 @@
 </table>
 
 @code {
+    @inject AuthenticationStateProvider AuthStateProvider
+
+    @inject IAuthorizationService AuthorizationService
     private List<CorporateEvent> events = new();
     private List<Employee> employees = new();
     private List<Venue> venues = new();
@@ -140,20 +145,20 @@
     private async Task LoadData()
     {
         employees = await Db.Employees
-            .OrderBy(e => e.FullName)
-            .ToListAsync();
+        .OrderBy(e => e.FullName)
+        .ToListAsync();
 
         venues = await Db.Venues
-            .OrderBy(v => v.Name)
-            .ToListAsync();
+        .OrderBy(v => v.Name)
+        .ToListAsync();
 
         events = await Db.CorporateEvents
-            .Include(e => e.Venue)
-            .Include(e => e.Organizer)
-            .Include(e => e.Participants) 
-            .Include(e => e.Tasks)            
-            .OrderBy(e => e.EventDate)
-            .ToListAsync();
+        .Include(e => e.Venue)
+        .Include(e => e.Organizer)
+        .Include(e => e.Participants)
+        .Include(e => e.Tasks)
+        .OrderBy(e => e.EventDate)
+        .ToListAsync();
     }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
@@ -189,6 +194,15 @@
 
     private async Task SaveEvent()
     {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        var allowed = await AuthorizationService.AuthorizeAsync(user, "CanManageEvents");
+        if (!allowed.Succeeded)
+        {
+            // можно показать error, или просто return
+            return;
+        }
         if (currentEvent.Id == 0)
         {
             Db.CorporateEvents.Add(currentEvent);
@@ -205,6 +219,15 @@
 
     private async Task EditEvent(int id)
     {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        var allowed = await AuthorizationService.AuthorizeAsync(user, "CanManageEvents");
+        if (!allowed.Succeeded)
+        {
+            // можно показать error, или просто return
+            return;
+        }
         var ev = await Db.CorporateEvents.FindAsync(id);
         if (ev is not null)
         {
@@ -223,6 +246,15 @@
 
     private async Task DeleteEvent(int id)
     {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        var allowed = await AuthorizationService.AuthorizeAsync(user, "CanManageEvents");
+        if (!allowed.Succeeded)
+        {
+            // можно показать error, или просто return
+            return;
+        }
         var ev = await Db.CorporateEvents.FindAsync(id);
         if (ev is not null)
         {
