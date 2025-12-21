@@ -1,9 +1,10 @@
 using Corporate.Models;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Corporate.Data;
 
-public class CorporateDbContext : DbContext
+public class CorporateDbContext : IdentityDbContext<AppUser>
 {
     public CorporateDbContext(DbContextOptions<CorporateDbContext> options)
         : base(options)

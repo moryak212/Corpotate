@@ -1,0 +1,29 @@
+@page "/login"
+@rendermode InteractiveServer
+
+@inject NavigationManager Nav
+
+<h3>Вход</h3>
+
+@if (HasError)
+{
+    <div class="alert alert-danger">Неверный email или пароль.</div>
+}
+
+<form method="post" action="/account/login">
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input class="form-control" name="email" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Пароль</label>
+        <input class="form-control" name="password" type="password" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Войти</button>
+</form>
+
+@code {
+    private bool HasError => Nav.Uri.Contains("error=1");
+}

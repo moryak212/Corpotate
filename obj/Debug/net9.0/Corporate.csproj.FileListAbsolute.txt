@@ -231,3 +231,4 @@ C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compresse
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\t0qo7o574p-dd6z7egasc.gz
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\b9lhb08218-5pze98is44.gz
 C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\compressed\yfc7ypekbg-mlv21k5csn.gz
+C:\Users\Серафим\Downloads\Corporate\Corporate\obj\Debug\net9.0\Corporate.sourcelink.json

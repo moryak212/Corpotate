@@ -4,15 +4,12 @@ namespace Corporate.Models;
 
 public class AppUser : IdentityUser
 {
-    // ФИО
     public string FullName { get; set; } = string.Empty;
 
-    // Отдел (выпадающий список)
-    public string Department { get; set; } = string.Empty;
+    // поле выбора: отдел
+    public int DepartmentId { get; set; }
+    public Department? Department { get; set; }
 
-    // Роль в компании (не путать с ролью безопасности)
-    public string CompanyRole { get; set; } = string.Empty;
-
-    // Дата найма (опционально)
-    public DateTime? HireDate { get; set; }
+    // поле выбора: должность/роль в компании (не security-role)
+    public string Position { get; set; } = string.Empty;
 }
