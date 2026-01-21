@@ -41,17 +41,21 @@ else
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <h6 class="text-uppercase text-muted mb-1">Сотрудники и площадки</h6>
-                            <div class="display-6 fw-semibold">@totalEmployees</div>
+
+                            <div class="display-6 fw-semibold">@totalPeopleAndVenues</div>
+
                             <div class="text-muted small">
-                                Сотрудников<br />
+                                Сотрудников: <strong>@totalEmployees</strong><br />
                                 Площадок: <strong>@totalVenues</strong>
                             </div>
                         </div>
+
                         <span class="bi bi-person-badge-fill-nav-menu" style="opacity:0.2;"></span>
                     </div>
                 </div>
             </div>
         </div>
+
 
         <div class="col-md-4">
             <div class="card shadow-sm border-0 h-100">
@@ -62,10 +66,12 @@ else
                         <div class="fs-5 text-muted">/ @totalTasks</div>
                     </div>
                     <div class="progress" style="height: 0.7rem;">
-                        <div class="progress-bar" role="progressbar" style="width: @taskCompletionPercent%;"
+                        <div class="progress-bar" role="progressbar"
+                            style="width: @(taskCompletionPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%;"
                             aria-valuenow="@taskCompletionPercent" aria-valuemin="0" aria-valuemax="100">
                         </div>
                     </div>
+
                     <div class="text-muted small mt-2">
                         Выполнено @taskCompletionPercent.ToString("0") % всех задач
                     </div>
@@ -120,6 +126,40 @@ else
             }
         </div>
 
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">Корпоративы за 6 месяцев</h5>
+                        <span class="text-muted small">шт.</span>
+                    </div>
+
+                    @if (!eventsByMonth.Any())
+                    {
+                        <p class="text-muted mb-0">Нет данных.</p>
+                    }
+                    else
+                    {
+                        <div class="mini-bars">
+                            @foreach (var m in eventsByMonth)
+                            {
+                                var h = (int)Math.Round((double)m.Count / maxMonthCount * 100.0);
+                                var isPastMonth = m.MonthStart < new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+                                var barClass = isPastMonth ? "mini-bar-fill done" : "mini-bar-fill upcoming";
+
+                                <div class="mini-bar-col">
+                                    <div class="mini-bar-track">
+                                        <div class="@barClass" style="height:@h%" title="@m.Count"></div>
+                                    </div>
+                                    <div class="mini-bar-label">@m.Label</div>
+                                    <div class="mini-bar-value text-muted">@m.Count</div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
 
         <div class="col-lg-4">
             <div class="card shadow-sm border-0 h-100">
@@ -146,6 +186,9 @@ else
             </div>
         </div>
     </div>
+
+
+
 
     <!-- Третья строка: ближайшие корпоративы -->
     <div class="row g-3">
@@ -198,7 +241,11 @@ else
 
 @code {
     private bool isLoading = true;
+    private List<(DateTime MonthStart, string Label, int Count)> eventsByMonth = new();
+    private int maxMonthCount => eventsByMonth.Count == 0 ? 1 : eventsByMonth.Max(x => x.Count);
 
+
+    private int totalPeopleAndVenues => totalEmployees + totalVenues;
     private int totalEvents;
     private int upcomingEvents;
     private int eventsThisMonth;
@@ -304,6 +351,34 @@ else
         .ToListAsync();
 
         isLoading = false;
+
+        // последние 6 месяцев (включая текущий)
+        var startMonth = new DateTime(today.Year, today.Month, 1).AddMonths(-5);
+        var endMonth = new DateTime(today.Year, today.Month, 1).AddMonths(1);
+
+        // тянем события за диапазон
+        var monthGroups = await Db.CorporateEvents
+        .Where(e => e.EventDate >= startMonth && e.EventDate < endMonth)
+        .GroupBy(e => new { e.EventDate.Year, e.EventDate.Month })
+        .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+        .ToListAsync();
+
+        // заполняем 6 месяцев подряд (даже если в каком-то 0)
+        eventsByMonth = Enumerable.Range(0, 6)
+        .Select(i =>
+        {
+            var dt = startMonth.AddMonths(i);
+            var c = monthGroups.FirstOrDefault(x => x.Year == dt.Year && x.Month == dt.Month)?.Count ?? 0;
+
+            return (
+    MonthStart: dt,
+    Label: dt.ToString("MMM", CultureInfo.GetCultureInfo("ru-RU")),
+    Count: c
+    );
+        })
+        .ToList();
+
+
     }
 
 }
@@ -330,5 +405,53 @@ else
         height: 12px;
         border-radius: 3px;
         display: inline-block;
+    }
+
+    .mini-bars {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+        height: 160px;
+    }
+
+    .mini-bar-col {
+        width: 52px;
+        text-align: center;
+    }
+
+    .mini-bar-track {
+        height: 120px;
+        background: #f1f3f5;
+        border-radius: 10px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: flex-end;
+    }
+
+    .mini-bar-fill {
+        width: 100%;
+        background: var(--bs-primary);
+        border-radius: 10px 10px 0 0;
+        transition: height .25s ease;
+    }
+
+    .mini-bar-label {
+        margin-top: 6px;
+        font-size: 0.85rem;
+        text-transform: capitalize;
+    }
+
+    .mini-bar-value {
+        font-size: 0.8rem;
+        line-height: 1.1;
+    }
+
+    .mini-bar-fill.upcoming {
+        background: var(--bs-primary);
+    }
+
+    .mini-bar-fill.done {
+        background: var(--bs-success);
     }
 </style>

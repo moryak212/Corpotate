@@ -12,17 +12,19 @@
 
 <h3>Задачи подготовки</h3>
 
-<div class="mb-4">
-    <label class="form-label">Корпоратив</label>
-    <select class="form-select" @onchange="OnEventChanged">
-        <option value="0">-- выберите корпоратив --</option>
-        @foreach (var ev in events)
-        {
-            <option value="@ev.Id" selected="@(ev.Id == selectedEventId)">
-                @ev.Title (@ev.EventDate.ToShortDateString())
-            </option>
-        }
-    </select>
+<div class="row mb-4">
+    <div class="col-md-7">
+        <label class="form-label">Корпоратив</label>
+        <select class="form-select" @onchange="OnEventChanged">
+            <option value="0">-- выберите корпоратив --</option>
+            @foreach (var ev in events)
+            {
+                <option value="@ev.Id" selected="@(ev.Id == selectedEventId)">
+                    @ev.Title (@ev.EventDate.ToShortDateString())
+                </option>
+            }
+        </select>
+    </div>
 </div>
 
 @if (selectedEventId == 0)
