@@ -1,0 +1,126 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using Corporate.Models
+@page "/bbq"
+@rendermode InteractiveServer
+
+<h3>Калькулятор шашлыка и алкоголя</h3>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <EditForm Model="@input" OnValidSubmit="Recalc">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-2">
+                <label class="form-label">Гостей</label>
+                <InputNumber class="form-control" @bind-Value="input.Guests" />
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label">Длительность (часы)</label>
+                <InputNumber class="form-control" @bind-Value="input.Hours" />
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label">Сколько будут есть шашлык</label>
+                <InputSelect class="form-select" @bind-Value="input.Appetite">
+                    <option value="0">300 г/чел</option>
+                    <option value="1">400 г/чел</option>
+                    <option value="2">550 г/чел</option>
+                </InputSelect>
+            </div>
+
+            
+
+            <div class="mb-2">
+                <div class="form-check">
+                    <InputCheckbox class="form-check-input" @bind-Value="input.AlcoholEnabled" />
+                    <label class="form-check-label">Считать алкоголь</label>
+                </div>
+            </div>
+
+            @if (input.AlcoholEnabled)
+            {
+                <div class="mb-2">
+                    <label class="form-label">Формат алкоголя</label>
+                    <InputSelect class="form-select" @bind-Value="input.AlcoholMode">
+                        <option value="0">Пиво + вино + крепкое</option>
+                        <option value="1">Только пиво</option>
+                        <option value="2">Только вино</option>
+                        <option value="3">Только крепкое</option>
+                        <option value="4">Без алкоголя (0)</option>
+                    </InputSelect>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Пьющих</label>
+                    <InputNumber class="form-control" @bind-Value="input.Drinkers" />
+                </div>
+            }
+
+            <button type="submit" class="btn btn-primary mt-2">Рассчитать</button>
+            <button type="button" class="btn btn-outline-secondary mt-2 ms-2" @onclick="Reset">Сброс</button>
+        </EditForm>
+    </div>
+
+    <div class="col-lg-7">
+        @if (result is null)
+        {
+            <div class="text-muted">Заполни параметры и нажми «Рассчитать».</div>
+        }
+        else
+        {
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Результат</h5>
+
+                    <h6 class="mt-3">Шашлык и еда</h6>
+                    <ul class="mb-2">
+                        <li><b>Мясо:</b> @FmtKg(result.MeatKg) кг</li>
+                        <li><b>Маринад/лук:</b> @FmtKg(result.OnionKg) кг</li>
+                        <li><b>Овощи:</b> @FmtKg(result.VeggiesKg) кг</li>
+                        <li><b>Хлеб/лаваш:</b> @result.LavashPcs шт</li>
+                        <li><b>Соусы:</b> @FmtL(result.SauceL) л</li>
+                        <li><b>Вода/безалк:</b> @FmtL(result.NonAlcoholL) л</li>
+                        <li><b>Уголь:</b> @FmtKg(result.CoalKg) кг</li>
+                    </ul>
+
+                    @if (input.AlcoholEnabled && input.AlcoholMode != 4)
+                    {
+                        <h6 class="mt-3">Алкоголь</h6>
+                        <div class="text-muted mb-2">Пьющих: <b>@result.Drinkers</b></div>
+                        <ul class="mb-0">
+                            @if (result.BeerL > 0) { <li><b>Пиво:</b> @FmtL(result.BeerL) л</li> }
+                            @if (result.WineL > 0) { <li><b>Вино:</b> @FmtL(result.WineL) л</li> }
+                            @if (result.StrongL > 0) { <li><b>Крепкое:</b> @FmtL(result.StrongL) л</li> }
+                        </ul>
+                    }
+                </div>
+            </div>
+
+            <div class="alert alert-warning mt-3">
+                Значения ориентировочные: люди едят/пьют по-разному. Лучше иметь запас 10–15%.
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private BbqInput input = new();
+    private BbqResult? result;
+
+    private void Recalc()
+    {
+        result = BbqCalculator.Calculate(input);
+    }
+
+    private void Reset()
+    {
+        input = new BbqInput();
+        result = null;
+    }
+
+    private static string FmtKg(decimal kg) => kg.ToString("0.##");
+    private static string FmtL(decimal l) => l.ToString("0.##");
+    private static string FmtGr(int g) => g.ToString("0");
+}
