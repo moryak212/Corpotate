@@ -15,7 +15,7 @@ namespace Corporate.Models
 
         public string Title { get; set; } = string.Empty;
 
-        public DateTime Deadline { get; set; }
+        public DateTime Deadline { get; set; } = DateTime.Today;
 
         public string Status { get; set; } = "Новая";
 

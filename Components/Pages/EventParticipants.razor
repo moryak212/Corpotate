@@ -117,19 +117,19 @@ else
 
     private readonly string[] roles =
     {
-        "Участник",
-        "Организатор",
-        "Ведущий",
-        "Технический персонал"
-    };
+"Участник",
+"Организатор",
+"Ведущий",
+"Технический персонал"
+};
 
     private readonly string[] statuses =
     {
-        "Приглашён",
-        "Подтвердил участие",
-        "Отказался",
-        "Не ответил"
-    };
+"Приглашён",
+"Подтвердил участие",
+"Отказался",
+"Не ответил"
+};
 
     protected override async Task OnInitializedAsync()
     {
@@ -145,12 +145,12 @@ else
     private async Task LoadEventsAndEmployees()
     {
         events = await Db.CorporateEvents
-            .OrderBy(e => e.EventDate)
-            .ToListAsync();
+        .OrderBy(e => e.EventDate)
+        .ToListAsync();
 
         employees = await Db.Employees
-            .OrderBy(e => e.FullName)
-            .ToListAsync();
+        .OrderBy(e => e.FullName)
+        .ToListAsync();
     }
 
     private async Task LoadParticipants()
@@ -162,11 +162,13 @@ else
         }
 
         participants = await Db.EventParticipants
-            .Include(p => p.Employee)
-            .Where(p => p.CorporateEventId == selectedEventId)
-            .OrderBy(p => p.Employee!.FullName)
-            .ToListAsync();
+        .AsNoTracking()
+        .Include(p => p.Employee)
+        .Where(p => p.CorporateEventId == selectedEventId)
+        .OrderBy(p => p.Employee!.FullName)
+        .ToListAsync();
     }
+
 
     private async Task OnEventChanged(ChangeEventArgs e)
     {
@@ -183,15 +185,22 @@ else
         if (selectedEventId == 0 || currentParticipant.EmployeeId == 0)
             return;
 
-        currentParticipant.CorporateEventId = selectedEventId;
-
         if (currentParticipant.Id == 0)
         {
+            currentParticipant.CorporateEventId = selectedEventId;
             Db.EventParticipants.Add(currentParticipant);
         }
         else
         {
-            Db.EventParticipants.Update(currentParticipant);
+            var entity = await Db.EventParticipants.FindAsync(currentParticipant.Id);
+            if (entity is null)
+                return;
+
+            entity.CorporateEventId = selectedEventId;
+            entity.EmployeeId = currentParticipant.EmployeeId;
+            entity.Role = currentParticipant.Role;
+            entity.Status = currentParticipant.Status;
+            entity.Comment = currentParticipant.Comment;
         }
 
         await Db.SaveChangesAsync();
@@ -199,9 +208,13 @@ else
         ResetForm();
     }
 
+
     private async Task EditParticipant(int id)
     {
-        var p = await Db.EventParticipants.FindAsync(id);
+        var p = await Db.EventParticipants
+        .AsNoTracking()
+        .FirstOrDefaultAsync(x => x.Id == id);
+
         if (p is not null)
         {
             currentParticipant = new EventParticipant
@@ -216,16 +229,19 @@ else
         }
     }
 
+
     private async Task DeleteParticipant(int id)
     {
         var p = await Db.EventParticipants.FindAsync(id);
-        if (p is not null)
-        {
-            Db.EventParticipants.Remove(p);
-            await Db.SaveChangesAsync();
-            await LoadParticipants();
-        }
+        if (p is null)
+            return;
+
+        Db.EventParticipants.Remove(p);
+        await Db.SaveChangesAsync();
+
+        await LoadParticipants();
     }
+
 
     private void ResetForm()
     {

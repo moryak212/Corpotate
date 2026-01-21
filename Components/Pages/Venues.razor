@@ -89,25 +89,38 @@
 
     private async Task SaveVenue()
     {
+        if (string.IsNullOrWhiteSpace(currentVenue.Name))
+            return;
+
+        var action = currentVenue.Id == 0 ? "Create" : "Update";
+
         if (currentVenue.Id == 0)
         {
             Db.Venues.Add(currentVenue);
+            await Db.SaveChangesAsync();
+
+            await AuditService.LogAsync(action, "Venue", currentVenue.Id);
         }
         else
         {
-            Db.Venues.Update(currentVenue);
+            var entity = await Db.Venues.FindAsync(currentVenue.Id);
+            if (entity is null)
+                return;
+
+            entity.Name = currentVenue.Name;
+            entity.Address = currentVenue.Address;
+            entity.Capacity = currentVenue.Capacity;
+            entity.ContactPhone = currentVenue.ContactPhone;
+
+            await Db.SaveChangesAsync();
+
+            await AuditService.LogAsync(action, "Venue", entity.Id);
         }
-
-        await Db.SaveChangesAsync();
-        var action = currentVenue.Id == 0 ? "Create" : "Update";
-
-        await Db.SaveChangesAsync();
-
-        await AuditService.LogAsync(action, "Venue", currentVenue.Id);
 
         await LoadVenues();
         ResetForm();
     }
+
 
     private async Task EditVenue(int id)
     {
@@ -128,16 +141,15 @@
     private async Task DeleteVenue(int id)
     {
         var v = await Db.Venues.FindAsync(id);
-        if (v is not null)
-        {
-            Db.Venues.Remove(v);
-            await Db.SaveChangesAsync();
-            await LoadVenues();
-        }
+        if (v is null)
+            return;
+
+        Db.Venues.Remove(v);
         await Db.SaveChangesAsync();
 
         await AuditService.LogAsync("Delete", "Venue", id);
 
+        await LoadVenues();
     }
 
     private void ResetForm()

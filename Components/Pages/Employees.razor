@@ -75,8 +75,11 @@
                 <td>@e.Phone</td>
                 <td>@e.Department?.Name</td>
                 <td>
-                    <button class="btn btn-sm btn-primary me-1" @onclick="() => EditEmployee(e.Id)">Ред.</button>
-                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteEmployee(e.Id)">Удалить</button>
+                    <button type="button" class="btn btn-sm btn-primary me-1"
+                        @onclick="() => EditEmployee(e.Id)">Ред.</button>
+                    <button type="button" class="btn btn-sm btn-danger"
+                        @onclick="() => DeleteEmployee(e.Id)">Удалить</button>
+
                 </td>
             </tr>
         }
@@ -96,40 +99,62 @@
     private async Task LoadData()
     {
         departments = await Db.Departments
+        .AsNoTracking()
         .OrderBy(d => d.Name)
         .ToListAsync();
 
         employees = await Db.Employees
+        .AsNoTracking()
         .Include(e => e.Department)
         .OrderBy(e => e.FullName)
         .ToListAsync();
     }
 
+
     private async Task SaveEmployee()
     {
+
+        if (string.IsNullOrWhiteSpace(currentEmployee.FullName))
+            return;
+
+        var action = currentEmployee.Id == 0 ? "Create" : "Update";
+
         if (currentEmployee.Id == 0)
         {
             Db.Employees.Add(currentEmployee);
+            await Db.SaveChangesAsync();
+
+            await AuditService.LogAsync(action, "Employee", currentEmployee.Id);
         }
         else
         {
-            Db.Employees.Update(currentEmployee);
+            var entity = await Db.Employees.FindAsync(currentEmployee.Id);
+            if (entity is null)
+                return;
+
+
+            entity.FullName = currentEmployee.FullName;
+            entity.Position = currentEmployee.Position;
+            entity.Email = currentEmployee.Email;
+            entity.Phone = currentEmployee.Phone;
+            entity.DepartmentId = currentEmployee.DepartmentId;
+
+            await Db.SaveChangesAsync();
+
+            await AuditService.LogAsync(action, "Employee", entity.Id);
         }
-
-        await Db.SaveChangesAsync();
-        var action = currentEmployee.Id == 0 ? "Create" : "Update";
-
-        await Db.SaveChangesAsync();
-
-        await AuditService.LogAsync(action, "Employee", currentEmployee.Id);
 
         await LoadData();
         ResetForm();
     }
 
+
     private async Task EditEmployee(int id)
     {
-        var e = await Db.Employees.FindAsync(id);
+        var e = await Db.Employees
+        .AsNoTracking()
+        .FirstOrDefaultAsync(x => x.Id == id);
+
         if (e is not null)
         {
             currentEmployee = new Employee
@@ -144,19 +169,22 @@
         }
     }
 
+
     private async Task DeleteEmployee(int id)
     {
         var e = await Db.Employees.FindAsync(id);
-        if (e is not null)
-        {
-            Db.Employees.Remove(e);
-            await Db.SaveChangesAsync();
-            await LoadData();
-        }
+        if (e is null)
+            return;
+
+        Db.Employees.Remove(e);
         await Db.SaveChangesAsync();
 
         await AuditService.LogAsync("Delete", "Employee", id);
+
+        await LoadData();
     }
+
+
 
     private void ResetForm()
     {

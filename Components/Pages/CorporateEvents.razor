@@ -10,8 +10,8 @@
 @inject CorporateDbContext Db
 @inject IWebHostEnvironment Env
 @inject AuditService AuditService
-
-
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IAuthorizationService AuthorizationService
 
 <h3>Корпоративы</h3>
 
@@ -19,12 +19,15 @@
     <div class="col-md-7">
         <EditForm Model="@currentEvent" OnValidSubmit="@SaveEvent" FormName="EventForm">
             <DataAnnotationsValidator />
-            <ValidationSummary />
+
 
             <div class="mb-3">
                 <label class="form-label">Название</label>
                 <InputText class="form-control" @bind-Value="currentEvent.Title" />
+                <ValidationMessage For="() => currentEvent.Title" />
             </div>
+
+
 
             <div class="mb-3">
                 <label class="form-label">Дата</label>
@@ -118,8 +121,13 @@
                 </td>
                 <td>
                     <AuthorizeView Policy="CanManageEvents">
-                        <button class="btn btn-sm btn-primary" ...>Ред.</button>
-                        <button class="btn btn-sm btn-danger" ...>Удалить</button>
+                        <button type="button" class="btn btn-sm btn-primary me-1" @onclick="() => EditEvent(ev.Id)">
+                            Ред.
+                        </button>
+
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteEvent(ev.Id)">
+                            Удалить
+                        </button>
                     </AuthorizeView>
                 </td>
             </tr>
@@ -128,9 +136,7 @@
 </table>
 
 @code {
-    @inject AuthenticationStateProvider AuthStateProvider
 
-    @inject IAuthorizationService AuthorizationService
     private List<CorporateEvent> events = new();
     private List<Employee> employees = new();
     private List<Venue> venues = new();
@@ -197,6 +203,8 @@
 
     private async Task SaveEvent()
     {
+        if (string.IsNullOrWhiteSpace(currentEvent.Title))
+            return;
         await AuditService.LogAsync(
         currentEvent.Id == 0 ? "Create" : "Update",
         "CorporateEvent",
@@ -217,7 +225,15 @@
         }
         else
         {
-            Db.CorporateEvents.Update(currentEvent);
+            var ev = await Db.CorporateEvents.FindAsync(currentEvent.Id);
+            if (ev is null) return;
+
+            ev.Title = currentEvent.Title;
+            ev.EventDate = currentEvent.EventDate;
+            ev.Description = currentEvent.Description;
+            ev.VenueId = currentEvent.VenueId;
+            ev.OrganizerId = currentEvent.OrganizerId;
+            ev.ImagePath = currentEvent.ImagePath;
         }
 
         await Db.SaveChangesAsync();

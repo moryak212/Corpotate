@@ -102,8 +102,8 @@ else
                     <td>@t.Status</td>
                     <td>@t.Comment</td>
                     <td>
-                        <button class="btn btn-sm btn-primary me-1" @onclick="() => EditTask(t.Id)">Ред.</button>
-                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteTask(t.Id)">Удалить</button>
+                        <button type="button" class="btn btn-sm btn-primary me-1" @onclick="() => EditTask(t.Id)">Ред.</button>
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteTask(t.Id)">Удалить</button>
                     </td>
                 </tr>
             }
@@ -148,11 +148,13 @@ else
     private async Task LoadTasks()
     {
         tasks = await Db.EventTasks
+        .AsNoTracking()
         .Include(t => t.Executor)
         .Where(t => t.CorporateEventId == selectedEventId)
         .OrderBy(t => t.Deadline)
         .ToListAsync();
     }
+
 
     private async Task OnEventChanged(ChangeEventArgs e)
     {
@@ -166,34 +168,45 @@ else
 
     private async Task SaveTask()
     {
-
         if (string.IsNullOrWhiteSpace(currentTask.Title))
             return;
 
-        currentTask.CorporateEventId = selectedEventId;
+        var action = currentTask.Id == 0 ? "Create" : "Update";
 
         if (currentTask.Id == 0)
         {
+            currentTask.CorporateEventId = selectedEventId;
             Db.EventTasks.Add(currentTask);
         }
         else
         {
-            Db.EventTasks.Update(currentTask);
-        }
+            var entity = await Db.EventTasks.FindAsync(currentTask.Id);
+            if (entity is null) return;
 
-        await Db.SaveChangesAsync();
-        var action = currentTask.Id == 0 ? "Create" : "Update";
+            entity.CorporateEventId = selectedEventId;
+            entity.Title = currentTask.Title;
+            entity.Deadline = currentTask.Deadline;
+            entity.EmployeeId = currentTask.EmployeeId;
+            entity.Status = currentTask.Status;
+            entity.Comment = currentTask.Comment;
+        }
 
         await Db.SaveChangesAsync();
 
         await AuditService.LogAsync(action, "EventTask", currentTask.Id);
+
         await LoadTasks();
         ResetForm();
     }
 
+
+
     private async Task EditTask(int id)
     {
-        var t = await Db.EventTasks.FindAsync(id);
+        var t = await Db.EventTasks
+        .AsNoTracking()
+        .FirstOrDefaultAsync(x => x.Id == id);
+
         if (t != null)
         {
             currentTask = new EventTask
@@ -208,6 +221,7 @@ else
             };
         }
     }
+
 
     private async Task DeleteTask(int id)
     {
